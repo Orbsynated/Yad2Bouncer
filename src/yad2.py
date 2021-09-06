@@ -3,14 +3,39 @@ import logging
 import time
 from contextlib import contextmanager
 from sys import platform
+from typing import Generator
 
 from fake_useragent import UserAgent
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webelement import WebElement
+
+from utils import retryable
 
 
 class Yad2Error(Exception):
     pass
+
+
+def get_chrome_options():
+    options = webdriver.ChromeOptions()
+    ua = UserAgent()
+    user_agent = ua.random
+    options.add_argument(f'user-agent={user_agent}')
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-setuid-sandbox")
+    options.add_argument("--remote-debugging-port=9222")
+    options.add_argument("--disable-dev-shm-using")
+    options.add_argument('--disable-notifications')
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-gpu")
+    options.add_argument("start-maximized")
+    options.add_argument("disable-infobars")
+    if platform in ('linux', 'linux2'):
+        options.binary_location = '/usr/bin/google-chrome-stable'
+        options.add_argument('headless')
+
+    return options
 
 
 class Yad2:
@@ -26,24 +51,12 @@ class Yad2:
     POPUP_BOX_CLOSE_CLASS = 'closeToolTipIframe'
     SECOND_POPUP_BOX_CLOSE_CLASS = 'close_btn'
 
-    def reinit(self):
+    def re_init(self):
         if self._driver is not None:
             self._driver.quit()
-        options = webdriver.ChromeOptions()
-        ua = UserAgent()
-        user_agent = ua.random
-        options.add_argument(f'user-agent={user_agent}')
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-setuid-sandbox")
-        options.add_argument("--remote-debugging-port=9222")
-        options.add_argument("--disable-dev-shm-using")
-        options.add_argument('--disable-notifications')
-        options.add_argument("--disable-extensions")
-        options.add_argument("--disable-gpu")
-        options.add_argument("start-maximized")
-        options.add_argument("disable-infobars")
+        options = get_chrome_options()
 
-        if platform == "linux" or platform == "linux2":
+        if platform in ('linux', 'linux2'):
             options.binary_location = '/usr/bin/google-chrome-stable'
             options.add_argument('headless')
 
@@ -53,28 +66,11 @@ class Yad2:
             chrome_kwargs['executable_path'] = self.executable_path
 
         self._driver = webdriver.Chrome(**chrome_kwargs)
-        self._create_logger('yad2.log')
 
     def __init__(self, executable_path=None):
         self.executable_path = None
 
-        options = webdriver.ChromeOptions()
-        ua = UserAgent()
-        user_agent = ua.random
-        options.add_argument(f'user-agent={user_agent}')
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-setuid-sandbox")
-        options.add_argument("--remote-debugging-port=9222")
-        options.add_argument("--disable-dev-shm-using")
-        options.add_argument('--disable-notifications')
-        options.add_argument("--disable-extensions")
-        options.add_argument("--disable-gpu")
-        options.add_argument("start-maximized")
-        options.add_argument("disable-infobars")
-
-        if platform == "linux" or platform == "linux2":
-            options.binary_location = '/usr/bin/google-chrome-stable'
-            options.add_argument('headless')
+        options = get_chrome_options()
 
         chrome_kwargs = {'options': options}
 
@@ -83,25 +79,20 @@ class Yad2:
             chrome_kwargs['executable_path'] = self.executable_path or executable_path
 
         self._driver = webdriver.Chrome(**chrome_kwargs)
-        self._create_logger('yad2.log')
+        self._create_logger()
 
-    def _create_logger(self, logfile):
-        logger_handler = logging.FileHandler(logfile, encoding='utf8')
-        logger_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        logger_handler.setFormatter(logger_formatter)
+    def _create_logger(self):
         self._logger = logging.getLogger(__name__)
-        self._logger.setLevel(logging.DEBUG)
-        self._logger.addHandler(logger_handler)
 
     @contextmanager
     def login(self, email, password):
-        self._logger.info('Logging in to %s', email)
-        retryable(self._login, self.reinit, 10, email, password)
+        self._logger.debug('Logging in to %s', email)
+        retryable(self._login, self.re_init, 10, email, password)
         self._logger.info('Logged in to %s', email)
         try:
             yield
         finally:
-            self._logger.info('Logging out from %s', email)
+            self._logger.debug('Logging out from %s', email)
             self._logout()
             self._logger.info('Logged out from %s', email)
 
@@ -122,7 +113,7 @@ class Yad2:
         with self.enter_alert() as alert:
             alert.accept()
 
-    def iterate_categories(self):
+    def iterate_categories(self) -> Generator[str, None, None]:
         """
         Iterates over all the available categories.
         Every available category in entered and its name is yielded.
@@ -131,7 +122,7 @@ class Yad2:
         elements in the page, therefore every time a category is selected all the categories should be
         queried again and iterated until all the categories where visited.
         """
-        visited_categories = list()
+        visited_categories = []
         iterated_all_categories = False
         while not iterated_all_categories:
             # Obtain the list of categories
@@ -151,20 +142,22 @@ class Yad2:
             else:
                 iterated_all_categories = True
 
-    def iterate_ads(self):
+    def iterate_ads(self) -> Generator[WebElement, WebElement, None]:
         return (ad for ad in self._driver.find_elements_by_class_name('item'))
 
-    def bounce_all_ads(self):
+    def bounce_all_ads(self) -> None:
         for category_text in self.iterate_categories():
-            self._logger.info(u'Opened category: ' + category_text)
+            self._logger.info('Opened category: %s}', category_text)
             for ad in self.iterate_ads():
                 ad_status = ad.find_element_by_class_name('status_wrapper')
                 self.close_popup()
-                if ad_status.text == u'פג תוקף':
+                if ad_status.text == 'פג תוקף':
                     ad_text = ad.find_element_by_class_name('textArea').text
                     self._logger.info('The following ad is out dated: %s', ad_text)
                     continue
                 with self.enter_ad(ad):
+                    # Sometimes it takes a while to load the iframe
+                    time.sleep(3)
                     self.close_popup()
                     ad_details = self._driver.find_element_by_class_name('details_area').text.strip().replace('\n', ' ')
                     ad_details = (
@@ -173,20 +166,20 @@ class Yad2:
                     )
                     self._logger.info('Handling ad: %s', ad_details)
                     bounce_button = self._driver.find_element_by_id('bounceRatingOrderBtn')
-                    if bounce_button.value_of_css_property('background').startswith(u'rgb(204, 204, 204)'):
-                        self._logger.info('Bounce button is disabled')
+                    if bounce_button.value_of_css_property('background').startswith('rgb(204, 204, 204)'):
+                        self._logger.info('Bounce button is disabled, no work is needed')
                     else:
                         bounce_button.click()
                         self._logger.info('Bounced Ad!')
 
     @contextmanager
-    def enter_ad(self, ad):
+    def enter_ad(self, ad: WebElement):
         # Open the ad
         ad.click()
         ad_content_frames = self._driver.find_elements_by_tag_name('iframe')
-        # Find the iframe of the ad by ad's orderid
+        # Find the iframe of the ad by ad's order-id
         ad_content_frames = filter(
-            lambda e: e.get_attribute('src').endswith(u'OrderID=' + ad.get_attribute('data-orderid')),
+            lambda e: e.get_attribute('src').endswith('OrderID=' + ad.get_attribute('data-orderid')),
             ad_content_frames
         )
         ad_content_frames = list(ad_content_frames)
@@ -207,7 +200,7 @@ class Yad2:
             box = self._driver.find_element_by_id(Yad2.POPUP_BOX_CLASS)
             if box is None:
                 return
-            close_elements = list()
+            close_elements = []
             box_close_class = box.find_elements(By.CLASS_NAME, Yad2.POPUP_BOX_CLOSE_CLASS)
             second_box_close_class = box.find_elements(By.CLASS_NAME, Yad2.SECOND_POPUP_BOX_CLOSE_CLASS)
 
@@ -218,10 +211,9 @@ class Yad2:
 
             for elem in close_elements:
                 elem.click()
-            time.sleep(2)
-        except Exception as exc:
-            self._logger.error("Failed to close popup: %s", str(exc))
-            pass
+            time.sleep(1)
+        except (ValueError, Exception) as exc:
+            self._raise_error(("Failed to close popup: %s", str(exc)))
 
     @contextmanager
     def enter_iframe(self, iframe):
@@ -244,14 +236,3 @@ class Yad2:
     def _raise_error(self, error_message):
         self._logger.error(error_message)
         raise Yad2Error(error_message)
-
-
-def retryable(fun, re_init_func, max_tries=10, *args):
-    for i in range(max_tries):
-        try:
-            fun(*args)
-            break
-        except Exception:
-            re_init_func()
-            # time.sleep(5)
-            continue
