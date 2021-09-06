@@ -1,6 +1,4 @@
 # Yad2 Bouncer
-This is a fork of [yoavravid's Yad2Bouncer](https://github.com/yoavravid/Yad2Bouncer) with added sanity checks and fixes.
-
 A script for bouncing Yad2 ads.
 The script runs in 2 ways:
 * Windows mode - runs with a normal chrome instance
@@ -27,3 +25,6 @@ python3 src\main.py [-d <chrome_drive>] <username> <password>
 * Chrome driver
     + For linux run `make chromedrive`
     + Download at https://sites.google.com/a/chromium.org/chromedriver/home.
+
+# Credits
+This is a fork of [yoavravid's Yad2Bouncer](https://github.com/yoavravid/Yad2Bouncer) with added sanity checks and fixes.
