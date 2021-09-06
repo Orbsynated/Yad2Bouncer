@@ -1,9 +1,10 @@
 import argparse
 import logging
 from datetime import datetime
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from sys import stdout
 
-import telegram
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 from yad2 import Yad2
@@ -29,6 +30,7 @@ def get_arguments():
                         help='Whether to bounce automatically every 4 hours')
     parser.add_argument('-v', '--verbosity', required=False, dest='verbosity', type=is_verbosity_name_valid,
                         default=logging.INFO)
+    parser.add_argument('--logs-path', required=False, dest='logs_path', type=Path, default=Path('../logs'))
     parser.add_argument('email')
     parser.add_argument('password')
     return parser.parse_args()
@@ -42,7 +44,7 @@ def is_verbosity_name_valid(name: str):
 
 def main():
     arguments = get_arguments()
-    _create_logger('yad2.log', arguments.verbosity)
+    _create_logger(arguments.logs_path, arguments.verbosity)
     yad2 = Yad2(arguments.driver_path)
 
     if arguments.schedule:
@@ -51,13 +53,18 @@ def main():
         start_bouncing(arguments, yad2)
 
 
-def _create_logger(logfile: str, verbosity: int):
-    logger_file_handler = logging.FileHandler(logfile, encoding='utf8')
-    handler = logging.StreamHandler(stdout)
-    handlers = [handler, logger_file_handler]
+def _create_logger(logfile: Path, verbosity: int):
+    log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
+    # create folder for logs if not exists
+    logfile.mkdir(parents=True, exist_ok=True)
+    file_name = logfile.joinpath('yad2.log')
+    logger_file_handler = RotatingFileHandler(str(file_name), encoding='utf8', mode='a', maxBytes=5 * 1024 * 1024)
+    logger_file_handler.setFormatter(log_formatter)
+    stdout_handler = logging.StreamHandler(stdout)
+    stdout_handler.setFormatter(log_formatter)
+    handlers = [stdout_handler, logger_file_handler]
     logging.basicConfig(
         level=verbosity,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=handlers,
     )
 

@@ -1,5 +1,5 @@
 run:
-	python src/main.py -d ./bin/chromedriver ${EMAIL} ${PASSWORD}
+	python src/main.py -d ./bin/chromedriver ${EMAIL} ${PASSWORD} ${FLAGS}
 
 install: chrome chromedriver
 	apt-get install -y python3-pip

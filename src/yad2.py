@@ -93,6 +93,7 @@ class Yad2:
             yield
         finally:
             self._logger.debug('Logging out from %s', email)
+            time.sleep(1)
             self._logout()
             self._logger.info('Logged out from %s', email)
 

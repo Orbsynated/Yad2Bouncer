@@ -42,6 +42,8 @@ cmake-build-*/
 # File-based project format
 *.iws
 
+*.png
+
 # IntelliJ
 out/
 
@@ -69,5 +71,6 @@ fabric.properties
 # Custom
 *.log
 *.pyc
+logs/
 
 venv/
