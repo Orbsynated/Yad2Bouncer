@@ -42,5 +42,5 @@ python3 src\main.py [...flags] <username> <password>
 
 ## Credits
 
-This is a fork of [yoavravid's Yad2Bouncer](https://github.com/yoavravid/Yad2Bouncer) with added feature, sanity checks
+This is a fork of [yoavravid's Yad2Bouncer](https://github.com/yoavravid/Yad2Bouncer) with added features, sanity checks
 and fixes.
