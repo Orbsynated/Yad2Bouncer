@@ -26,5 +26,5 @@ python3 src\main.py [-d <chrome_drive>] <username> <password>
     + For linux run `make chromedrive`
     + Download at https://sites.google.com/a/chromium.org/chromedriver/home.
 
-# Credits
+# Disclaimer
 This is a fork of [yoavravid's Yad2Bouncer](https://github.com/yoavravid/Yad2Bouncer) with added sanity checks and fixes.
