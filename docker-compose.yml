@@ -1,0 +1,9 @@
+version: "3.9"
+
+services:
+  yad2:
+    build: .
+    restart: always
+    environment:
+      EMAIL: ""
+      PASSWORD: ""
